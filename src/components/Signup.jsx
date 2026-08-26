@@ -11,14 +11,13 @@ const Signup = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
 
-    console.log("Email:", email);
-    console.log("Password:", password);
-    console.log("Confirm Password:", confirmPassword);
+    setError("");
+    setSuccess("");
 
     if (!email || !password || !confirmPassword) {
       setError("Please fill in all fields.");
@@ -46,18 +45,27 @@ const Signup = () => {
 
       await sendEmailVerification(userCredential.user);
 
-      console.log("User has successfully signed up.");
-      console.log("Verification email sent");
+      setSuccess(
+        "Signup successful! Please check your email and verify your account.",
+      );
 
       setEmail("");
       setPassword("");
       setConfirmPassword("");
     } catch (error) {
-      console.log("Firebase Error:", error);
-      console.log("Error Code:", error.code);
-      console.log("Error Message:", error.message);
+      let errorMessage = error.message;
 
-      setError(error.message);
+      if (error.code === "auth/email-already-in-use") {
+        errorMessage = "This email is already registered. Please login.";
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "Invalid email address.";
+      } else if (error.code === "auth/weak-password") {
+        errorMessage = "Password must be at least 6 characters.";
+      } else if (error.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please try again.";
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -104,7 +112,9 @@ const Signup = () => {
 
         <br />
 
-        {error && <p>{error}</p>}
+        {error && <p style={{ color: "red" }}>{error}</p>}
+
+        {success && <p style={{ color: "green" }}>{success}</p>}
 
         <button type="submit" disabled={loading}>
           {loading ? "Signing up..." : "Sign Up"}

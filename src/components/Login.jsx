@@ -16,14 +16,13 @@ const Login = () => {
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
 
     if (!email || !password) {
-      setError("Please fill the field");
+      setError("Please fill in all fields.");
       return;
     }
-    console.log(email);
-    console.log(password);
 
     setLoading(true);
 
@@ -34,13 +33,20 @@ const Login = () => {
         password,
       );
 
+      if (!userCredential.user.emailVerified) {
+        setError("Please verify your email before logging in.");
+        return;
+      }
+
       const token = await userCredential.user.getIdToken();
+
       localStorage.setItem("token", token);
+
       console.log("Login successfully");
 
-      setIsLoggedIn(true);
       setEmail("");
       setPassword("");
+      setIsLoggedIn(true);
     } catch (error) {
       let errorMessage = error.message;
 
@@ -50,12 +56,17 @@ const Login = () => {
         errorMessage = "Incorrect password. Please try again.";
       } else if (error.code === "auth/invalid-email") {
         errorMessage = "Invalid email address.";
+      } else if (error.code === "auth/invalid-credential") {
+        errorMessage = "Incorrect email or password.";
       } else if (error.code === "auth/too-many-requests") {
         errorMessage = "Too many failed attempts. Try again later.";
+      } else if (error.code === "auth/user-disabled") {
+        errorMessage = "This account has been disabled.";
+      } else if (error.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please try again.";
       }
 
       setError(errorMessage);
-      console.log("Login Error:", error.message);
     } finally {
       setLoading(false);
     }
@@ -63,12 +74,10 @@ const Login = () => {
 
   return (
     <div>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
       <h2>Login</h2>
 
       <form onSubmit={handleLoginSubmit}>
-        <label>Email</label>
+        <label>📧 Email</label>
         <br />
 
         <input
@@ -80,7 +89,7 @@ const Login = () => {
 
         <br />
 
-        <label>Password</label>
+        <label>🔒 Password</label>
         <br />
 
         <input
@@ -92,8 +101,10 @@ const Login = () => {
 
         <br />
 
+        {error && <p style={{ color: "red" }}>{error}</p>}
+
         <button type="submit" disabled={loading}>
-          {loading ? "Logging..." : "Login"}
+          {loading ? "Logging in..." : "Login"}
         </button>
       </form>
     </div>
