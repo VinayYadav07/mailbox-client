@@ -1,18 +1,14 @@
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
-import Welcome from "./Welcome";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  if (isLoggedIn) {
-    return <Welcome />;
-  }
+  const navigate = useNavigate();
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -35,18 +31,22 @@ const Login = () => {
 
       if (!userCredential.user.emailVerified) {
         setError("Please verify your email before logging in.");
+        setLoading(false);
         return;
       }
 
       const token = await userCredential.user.getIdToken();
 
       localStorage.setItem("token", token);
+      localStorage.setItem("userEmail", email);
 
       console.log("Login successfully");
+      console.log("Token stored:", localStorage.getItem("token"));
 
       setEmail("");
       setPassword("");
-      setIsLoggedIn(true);
+
+      navigate("/welcome");
     } catch (error) {
       let errorMessage = error.message;
 
@@ -73,40 +73,69 @@ const Login = () => {
   };
 
   return (
-    <div>
-      <h2>Login</h2>
+    <div style={{ maxWidth: "400px", margin: "50px auto", padding: "20px" }}>
+      <h2 style={{ textAlign: "center" }}>Login</h2>
 
       <form onSubmit={handleLoginSubmit}>
-        <label>📧 Email</label>
-        <br />
+        <div style={{ marginBottom: "15px" }}>
+          <label>📧 Email</label>
+          <br />
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
 
-        <input
-          type="email"
-          placeholder="Enter your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <div style={{ marginBottom: "15px" }}>
+          <label>🔒 Password</label>
+          <br />
+          <input
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
 
-        <br />
+        {error && <p style={{ color: "red", marginBottom: "10px" }}>{error}</p>}
 
-        <label>🔒 Password</label>
-        <br />
-
-        <input
-          type="password"
-          placeholder="Enter your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        <br />
-
-        {error && <p style={{ color: "red" }}>{error}</p>}
-
-        <button type="submit" disabled={loading}>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: loading ? "#6c757d" : "#007bff",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontSize: "16px",
+          }}
+        >
           {loading ? "Logging in..." : "Login"}
         </button>
       </form>
+
+      <div style={{ textAlign: "center", marginTop: "15px" }}>
+        Don't have an account? <Link to="/signup">Sign Up</Link>
+      </div>
     </div>
   );
 };

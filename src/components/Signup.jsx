@@ -3,6 +3,7 @@ import {
   sendEmailVerification,
 } from "firebase/auth";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { auth } from "../firebase";
 
 const Signup = () => {
@@ -72,54 +73,91 @@ const Signup = () => {
   };
 
   return (
-    <div>
-      <h2>Signup</h2>
+    <div style={{ maxWidth: "400px", margin: "50px auto", padding: "20px" }}>
+      <h2 style={{ textAlign: "center" }}>Signup</h2>
 
       <form onSubmit={handleSubmit}>
-        <label>📧 Email</label>
-        <br />
+        <div style={{ marginBottom: "15px" }}>
+          <label>📧 Email</label>
+          <br />
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
 
-        <input
-          type="email"
-          placeholder="Enter your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <div style={{ marginBottom: "15px" }}>
+          <label>🔒 Password</label>
+          <br />
+          <input
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
 
-        <br />
+        <div style={{ marginBottom: "15px" }}>
+          <label>🔒 Confirm Password</label>
+          <br />
+          <input
+            type="password"
+            placeholder="Confirm your password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
 
-        <label>🔒 Password</label>
-        <br />
+        {error && <p style={{ color: "red", marginBottom: "10px" }}>{error}</p>}
 
-        <input
-          type="password"
-          placeholder="Enter your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        {success && (
+          <p style={{ color: "green", marginBottom: "10px" }}>{success}</p>
+        )}
 
-        <br />
-
-        <label>🔒 Confirm Password</label>
-        <br />
-
-        <input
-          type="password"
-          placeholder="Confirm your password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-        />
-
-        <br />
-
-        {error && <p style={{ color: "red" }}>{error}</p>}
-
-        {success && <p style={{ color: "green" }}>{success}</p>}
-
-        <button type="submit" disabled={loading}>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: loading ? "#6c757d" : "#007bff",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontSize: "16px",
+          }}
+        >
           {loading ? "Signing up..." : "Sign Up"}
         </button>
       </form>
+
+      <div style={{ textAlign: "center", marginTop: "15px" }}>
+        Already have an account? <Link to="/login">Login</Link>
+      </div>
     </div>
   );
 };
