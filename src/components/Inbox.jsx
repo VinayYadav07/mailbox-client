@@ -77,14 +77,12 @@ const Inbox = ({ onUnreadCountChange }) => {
       try {
         let q;
         if (state.currentView === "sent") {
-          // Sent box - get emails sent by user
           q = query(
             collection(db, "mails"),
             where("from", "==", user.email.toLowerCase()),
             orderBy("createdAt", "desc"),
           );
         } else {
-          // Inbox - get emails received by user
           q = query(
             collection(db, "mails"),
             where("to", "==", user.email.toLowerCase()),
@@ -99,7 +97,7 @@ const Inbox = ({ onUnreadCountChange }) => {
         });
         dispatch({ type: "SET_EMAILS", payload: emailList });
 
-        // Notify App.js about unread count
+        // Unread count ko App.js ko bhejo
         if (onUnreadCountChange) {
           onUnreadCountChange(emailList.filter((email) => !email.read).length);
         }
@@ -109,7 +107,6 @@ const Inbox = ({ onUnreadCountChange }) => {
       }
     };
 
-    // Initial fetch
     fetchEmails();
 
     // Poll every 2 seconds
