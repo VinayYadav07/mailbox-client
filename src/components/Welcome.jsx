@@ -25,6 +25,21 @@ const Welcome = () => {
       </p>
       <div style={{ marginTop: "40px" }}>
         <button
+          onClick={() => navigate("/inbox")}
+          style={{
+            padding: "12px 30px",
+            background: "#007bff",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+            fontSize: "16px",
+            marginRight: "15px",
+          }}
+        >
+          📥 Inbox
+        </button>
+        <button
           onClick={() => navigate("/compose")}
           style={{
             padding: "12px 30px",

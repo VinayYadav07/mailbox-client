@@ -15,27 +15,22 @@ const App = () => {
           path="/"
           element={
             isAuthenticated ? (
-              <Navigate to="/welcome" />
+              <Navigate to="/inbox" />
             ) : (
               <Navigate to="/login" />
             )
           }
         />
-
         <Route path="/signup" element={<Signup />} />
-
         <Route path="/login" element={<Login />} />
-
         <Route
           path="/welcome"
           element={isAuthenticated ? <Welcome /> : <Navigate to="/login" />}
         />
-
         <Route
           path="/compose"
           element={isAuthenticated ? <Compose /> : <Navigate to="/login" />}
         />
-
         <Route
           path="/inbox"
           element={isAuthenticated ? <Inbox /> : <Navigate to="/login" />}
