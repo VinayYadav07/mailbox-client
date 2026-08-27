@@ -19,6 +19,7 @@ const initialState = {
   loading: true,
   error: null,
   selectedEmail: null,
+  currentView: "inbox",
 };
 
 const inboxReducer = (state, action) => {
@@ -52,6 +53,8 @@ const inboxReducer = (state, action) => {
           state.unreadCount -
           (state.emails.find((e) => e.id === action.payload)?.read ? 0 : 1),
       };
+    case "SET_VIEW":
+      return { ...state, currentView: action.payload, selectedEmail: null };
     default:
       return state;
   }
@@ -70,11 +73,23 @@ const Inbox = () => {
       }
 
       try {
-        const q = query(
-          collection(db, "mails"),
-          where("to", "==", user.email.toLowerCase()),
-          orderBy("createdAt", "desc"),
-        );
+        let q;
+        if (state.currentView === "sent") {
+          // Sent box - get emails sent by user
+          q = query(
+            collection(db, "mails"),
+            where("from", "==", user.email.toLowerCase()),
+            orderBy("createdAt", "desc"),
+          );
+        } else {
+          // Inbox - get emails received by user
+          q = query(
+            collection(db, "mails"),
+            where("to", "==", user.email.toLowerCase()),
+            orderBy("createdAt", "desc"),
+          );
+        }
+
         const querySnapshot = await getDocs(q);
         const emailList = [];
         querySnapshot.forEach((doc) => {
@@ -88,7 +103,7 @@ const Inbox = () => {
     };
 
     fetchEmails();
-  }, [navigate]);
+  }, [navigate, state.currentView]);
 
   const handleEmailClick = async (email) => {
     if (email.read) {
@@ -107,7 +122,7 @@ const Inbox = () => {
   };
 
   const handleDelete = async (e, emailId) => {
-    e.stopPropagation(); // Prevent opening email
+    e.stopPropagation();
     if (!confirm("Are you sure you want to delete this email?")) return;
 
     try {
@@ -122,6 +137,10 @@ const Inbox = () => {
 
   const handleBackToInbox = () => {
     dispatch({ type: "SELECT_EMAIL", payload: null });
+  };
+
+  const handleViewChange = (view) => {
+    dispatch({ type: "SET_VIEW", payload: view });
   };
 
   const handleCompose = () => {
@@ -154,7 +173,7 @@ const Inbox = () => {
             marginBottom: "20px",
           }}
         >
-          ⬅️ Back to Inbox
+          ⬅️ Back to {state.currentView === "sent" ? "Sent" : "Inbox"}
         </button>
         <div style={{ borderBottom: "1px solid #eee", paddingBottom: "15px" }}>
           <h3>{state.selectedEmail.subject}</h3>
@@ -207,12 +226,20 @@ const Inbox = () => {
         >
           ✏️ Compose
         </button>
+
+        {/* Inbox */}
         <div
+          onClick={() => handleViewChange("inbox")}
           style={{
             display: "flex",
             alignItems: "center",
             padding: "10px 0",
             borderBottom: "1px solid #eee",
+            cursor: "pointer",
+            background:
+              state.currentView === "inbox" ? "#e3f2fd" : "transparent",
+            borderRadius: "4px",
+            paddingLeft: "8px",
           }}
         >
           <span style={{ fontSize: "20px", marginRight: "10px" }}>📧</span>
@@ -230,30 +257,25 @@ const Inbox = () => {
             {state.unreadCount}
           </span>
         </div>
+
+        {/* Sent */}
         <div
+          onClick={() => handleViewChange("sent")}
           style={{
             display: "flex",
             alignItems: "center",
             padding: "10px 0",
-            color: "#666",
             cursor: "pointer",
-          }}
-        >
-          <span style={{ fontSize: "18px", marginRight: "10px" }}>⭐</span>
-          Starred
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "10px 0",
-            color: "#666",
-            cursor: "pointer",
+            background:
+              state.currentView === "sent" ? "#e3f2fd" : "transparent",
+            borderRadius: "4px",
+            paddingLeft: "8px",
           }}
         >
           <span style={{ fontSize: "18px", marginRight: "10px" }}>📤</span>
-          Sent
+          <span style={{ fontWeight: "bold" }}>Sent</span>
         </div>
+
         <button
           onClick={handleLogout}
           style={{
@@ -281,9 +303,12 @@ const Inbox = () => {
             marginBottom: "20px",
           }}
         >
-          <h2 style={{ margin: 0 }}>Inbox</h2>
+          <h2 style={{ margin: 0 }}>
+            {state.currentView === "sent" ? "📤 Sent Mail" : "📧 Inbox"}
+          </h2>
           <span style={{ color: "#666", fontSize: "14px" }}>
-            {state.emails.length} emails • {state.unreadCount} unread
+            {state.emails.length} emails
+            {state.currentView === "inbox" && ` • ${state.unreadCount} unread`}
           </span>
         </div>
 
@@ -291,7 +316,11 @@ const Inbox = () => {
           <div
             style={{ textAlign: "center", marginTop: "50px", color: "#666" }}
           >
-            <p>📭 No emails yet</p>
+            <p>
+              {state.currentView === "sent"
+                ? "📤 No sent emails yet"
+                : "📭 No emails yet"}
+            </p>
             <p>Click Compose to send your first email!</p>
           </div>
         )}
@@ -316,7 +345,8 @@ const Inbox = () => {
                 : "#f8faff")
             }
           >
-            {!email.read && (
+            {/* Blue dot only for inbox unread */}
+            {state.currentView === "inbox" && !email.read && (
               <span
                 style={{
                   display: "inline-block",
@@ -329,7 +359,7 @@ const Inbox = () => {
                 }}
               />
             )}
-            {email.read && (
+            {(state.currentView === "sent" || email.read) && (
               <span
                 style={{
                   width: "22px",
@@ -338,6 +368,7 @@ const Inbox = () => {
                 }}
               />
             )}
+
             <div
               style={{
                 display: "flex",
@@ -352,7 +383,7 @@ const Inbox = () => {
                   minWidth: "150px",
                 }}
               >
-                {email.from}
+                {state.currentView === "sent" ? email.to : email.from}
               </span>
               <span
                 style={{ fontWeight: email.read ? "normal" : "bold", flex: 1 }}
@@ -372,6 +403,7 @@ const Inbox = () => {
                 {email.message?.replace(/<[^>]*>/g, "").substring(0, 60)}...
               </span>
             </div>
+
             <span
               style={{ color: "#999", fontSize: "12px", marginRight: "10px" }}
             >
@@ -382,6 +414,7 @@ const Inbox = () => {
                   })
                 : "Just now"}
             </span>
+
             <button
               onClick={(e) => handleDelete(e, email.id)}
               style={{
