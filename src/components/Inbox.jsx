@@ -1,12 +1,55 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
+
+// Reducer for state management
+const initialState = {
+  emails: [],
+  unreadCount: 0,
+  loading: true,
+  error: null,
+  selectedEmail: null,
+};
+
+const inboxReducer = (state, action) => {
+  switch (action.type) {
+    case "SET_EMAILS":
+      return {
+        ...state,
+        emails: action.payload,
+        unreadCount: action.payload.filter((email) => !email.read).length,
+        loading: false,
+      };
+    case "SET_LOADING":
+      return { ...state, loading: action.payload };
+    case "SET_ERROR":
+      return { ...state, error: action.payload, loading: false };
+    case "SELECT_EMAIL":
+      return { ...state, selectedEmail: action.payload };
+    case "MARK_AS_READ":
+      return {
+        ...state,
+        emails: state.emails.map((email) =>
+          email.id === action.payload ? { ...email, read: true } : email,
+        ),
+        unreadCount: state.unreadCount - 1,
+      };
+    default:
+      return state;
+  }
+};
 
 const Inbox = () => {
-  const [emails, setEmails] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [state, dispatch] = useReducer(inboxReducer, initialState);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,27 +61,45 @@ const Inbox = () => {
       }
 
       try {
-        // ✅ orderBy hata diya
         const q = query(
           collection(db, "mails"),
           where("to", "==", user.email.toLowerCase()),
+          orderBy("createdAt", "desc"),
         );
         const querySnapshot = await getDocs(q);
         const emailList = [];
         querySnapshot.forEach((doc) => {
           emailList.push({ id: doc.id, ...doc.data() });
         });
-        setEmails(emailList);
+        dispatch({ type: "SET_EMAILS", payload: emailList });
       } catch (err) {
         console.error("Error fetching emails:", err);
-        setError("Failed to load emails");
-      } finally {
-        setLoading(false);
+        dispatch({ type: "SET_ERROR", payload: "Failed to load emails" });
       }
     };
 
     fetchEmails();
   }, [navigate]);
+
+  const handleEmailClick = async (email) => {
+    if (email.read) {
+      dispatch({ type: "SELECT_EMAIL", payload: email });
+      return;
+    }
+
+    try {
+      const emailRef = doc(db, "mails", email.id);
+      await updateDoc(emailRef, { read: true });
+      dispatch({ type: "MARK_AS_READ", payload: email.id });
+      dispatch({ type: "SELECT_EMAIL", payload: { ...email, read: true } });
+    } catch (err) {
+      console.error("Error marking email as read:", err);
+    }
+  };
+
+  const handleBackToInbox = () => {
+    dispatch({ type: "SELECT_EMAIL", payload: null });
+  };
 
   const handleCompose = () => {
     navigate("/compose");
@@ -50,97 +111,257 @@ const Inbox = () => {
     navigate("/login");
   };
 
-  if (loading) return <div>Loading emails...</div>;
+  if (state.loading)
+    return <div style={{ padding: "20px" }}>Loading emails...</div>;
+  if (state.error)
+    return <div style={{ padding: "20px", color: "red" }}>{state.error}</div>;
 
-  return (
-    <div style={{ maxWidth: "900px", margin: "40px auto", padding: "20px" }}>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "20px",
-        }}
-      >
-        <h2>📧 Inbox</h2>
-        <div>
-          <button
-            onClick={handleCompose}
-            style={{
-              padding: "10px 20px",
-              background: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              marginRight: "10px",
-            }}
-          >
-            ✏️ Compose
-          </button>
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: "10px 20px",
-              background: "#dc3545",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
-          >
-            🚪 Logout
-          </button>
+  if (state.selectedEmail) {
+    return (
+      <div style={{ maxWidth: "900px", margin: "40px auto", padding: "20px" }}>
+        <button
+          onClick={handleBackToInbox}
+          style={{
+            padding: "8px 16px",
+            background: "#6c757d",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            marginBottom: "20px",
+          }}
+        >
+          ⬅️ Back to Inbox
+        </button>
+        <div style={{ borderBottom: "1px solid #eee", paddingBottom: "15px" }}>
+          <h3>{state.selectedEmail.subject}</h3>
+          <p>
+            <strong>From:</strong> {state.selectedEmail.from}
+          </p>
+          <p>
+            <strong>To:</strong> {state.selectedEmail.to}
+          </p>
+          <p style={{ color: "#666", fontSize: "14px" }}>
+            {state.selectedEmail.createdAt?.toDate?.()
+              ? new Date(
+                  state.selectedEmail.createdAt.toDate(),
+                ).toLocaleString()
+              : "Just now"}
+          </p>
+        </div>
+        <div style={{ marginTop: "20px" }}>
+          <p>{state.selectedEmail.message?.replace(/<[^>]*>/g, "")}</p>
         </div>
       </div>
+    );
+  }
 
-      {/* Emails List */}
-      {emails.length > 0 && (
-        <div>
-          <h3 style={{ color: "#666", fontSize: "14px", marginBottom: "10px" }}>
-            Today
-          </h3>
-          {emails.map((email) => (
+  return (
+    <div
+      style={{
+        maxWidth: "1100px",
+        margin: "40px auto",
+        padding: "20px",
+        display: "flex",
+        gap: "20px",
+      }}
+    >
+      {/* Left Sidebar */}
+      <div style={{ width: "250px", minWidth: "250px" }}>
+        <button
+          onClick={handleCompose}
+          style={{
+            width: "100%",
+            padding: "12px",
+            background: "#007bff",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "16px",
+            marginBottom: "20px",
+          }}
+        >
+          ✏️ Compose
+        </button>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "10px 0",
+            borderBottom: "1px solid #eee",
+          }}
+        >
+          <span style={{ fontSize: "20px", marginRight: "10px" }}>📧</span>
+          <span style={{ fontWeight: "bold" }}>Inbox</span>
+          <span
+            style={{
+              marginLeft: "auto",
+              background: "#e3f2fd",
+              color: "#1976d2",
+              padding: "2px 10px",
+              borderRadius: "12px",
+              fontSize: "14px",
+            }}
+          >
+            {state.unreadCount}
+          </span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "10px 0",
+            color: "#666",
+            cursor: "pointer",
+          }}
+        >
+          <span style={{ fontSize: "18px", marginRight: "10px" }}>⭐</span>
+          Starred
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "10px 0",
+            color: "#666",
+            cursor: "pointer",
+          }}
+        >
+          <span style={{ fontSize: "18px", marginRight: "10px" }}>📤</span>
+          Sent
+        </div>
+        <button
+          onClick={handleLogout}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: "#dc3545",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            marginTop: "20px",
+          }}
+        >
+          🚪 Logout
+        </button>
+      </div>
+
+      {/* Email List */}
+      <div style={{ flex: 1 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+          }}
+        >
+          <h2 style={{ margin: 0 }}>Inbox</h2>
+          <span style={{ color: "#666", fontSize: "14px" }}>
+            {state.emails.length} emails • {state.unreadCount} unread
+          </span>
+        </div>
+
+        {state.emails.length === 0 && (
+          <div
+            style={{ textAlign: "center", marginTop: "50px", color: "#666" }}
+          >
+            <p>📭 No emails yet</p>
+            <p>Click Compose to send your first email!</p>
+          </div>
+        )}
+
+        {state.emails.map((email) => (
+          <div
+            key={email.id}
+            onClick={() => handleEmailClick(email)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "12px 15px",
+              borderBottom: "1px solid #f0f0f0",
+              cursor: "pointer",
+              background: email.read ? "white" : "#f8faff",
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = email.read
+                ? "white"
+                : "#f8faff")
+            }
+          >
+            {!email.read && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "10px",
+                  height: "10px",
+                  borderRadius: "50%",
+                  background: "#1a73e8",
+                  marginRight: "12px",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            {email.read && (
+              <span
+                style={{
+                  width: "22px",
+                  display: "inline-block",
+                  flexShrink: 0,
+                }}
+              />
+            )}
             <div
-              key={email.id}
               style={{
                 display: "flex",
-                justifyContent: "space-between",
-                padding: "12px 0",
-                borderBottom: "1px solid #eee",
-                cursor: "pointer",
+                flex: 1,
+                gap: "15px",
+                alignItems: "center",
               }}
             >
-              <div style={{ display: "flex", gap: "20px", flex: 1 }}>
-                <span style={{ fontWeight: "bold", minWidth: "150px" }}>
-                  {email.from}
-                </span>
-                <span style={{ flex: 1 }}>{email.subject}</span>
-                <span style={{ color: "#666", fontSize: "14px" }}>
-                  {email.message?.replace(/<[^>]*>/g, "").substring(0, 50)}...
-                </span>
-              </div>
-              <span style={{ color: "#999", fontSize: "12px" }}>
-                {email.createdAt?.toDate?.()
-                  ? new Date(email.createdAt.toDate()).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "Just now"}
+              <span
+                style={{
+                  fontWeight: email.read ? "normal" : "bold",
+                  minWidth: "150px",
+                }}
+              >
+                {email.from}
+              </span>
+              <span
+                style={{ fontWeight: email.read ? "normal" : "bold", flex: 1 }}
+              >
+                {email.subject}
+              </span>
+              <span
+                style={{
+                  color: "#666",
+                  fontSize: "13px",
+                  maxWidth: "300px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {email.message?.replace(/<[^>]*>/g, "").substring(0, 60)}...
               </span>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {emails.length === 0 && (
-        <div style={{ textAlign: "center", marginTop: "50px", color: "#666" }}>
-          <p>📭 No emails yet</p>
-          <p>Click Compose to send your first email!</p>
-        </div>
-      )}
+            <span
+              style={{ color: "#999", fontSize: "12px", marginLeft: "10px" }}
+            >
+              {email.createdAt?.toDate?.()
+                ? new Date(email.createdAt.toDate()).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Just now"}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

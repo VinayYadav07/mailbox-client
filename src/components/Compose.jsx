@@ -17,7 +17,7 @@ const Compose = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(true);
   const navigate = useNavigate();
 
-  // ✅ Auth check in useEffect with proper mounting
+  // Auth check in useEffect with proper mounting
   useEffect(() => {
     const checkAuth = () => {
       const user = auth.currentUser;
@@ -29,7 +29,7 @@ const Compose = () => {
     checkAuth();
   }, [navigate]);
 
-  // ✅ Don't render anything if not authenticated
+  // Don't render anything if not authenticated
   if (!isAuthenticated) {
     return null;
   }
@@ -72,7 +72,7 @@ const Compose = () => {
         subject: subject,
         message: message,
         createdAt: serverTimestamp(),
-        read: false,
+        read: false, // ✅ New emails are unread
       };
 
       await addDoc(collection(db, "mails"), mail);
@@ -82,8 +82,9 @@ const Compose = () => {
       setSubject("");
       setEditorState(EditorState.createEmpty());
 
+      // ✅ Redirect to Inbox after sending
       setTimeout(() => {
-        navigate("/welcome");
+        navigate("/inbox");
       }, 2000);
     } catch (error) {
       console.error("Error sending mail:", error);
@@ -165,7 +166,7 @@ const Compose = () => {
 
           <button
             type="button"
-            onClick={() => navigate("/welcome")}
+            onClick={() => navigate("/inbox")} // ✅ Cancel goes to Inbox
             style={{
               padding: "10px 24px",
               background: "#6c757d",
