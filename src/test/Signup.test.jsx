@@ -1,171 +1,134 @@
+import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import { BrowserRouter } from "react-router-dom";
+import Signup from "../components/Signup";
+
+vi.mock("firebase/auth", () => ({
+  createUserWithEmailAndPassword: vi.fn(),
+  sendEmailVerification: vi.fn(),
+}));
+
+vi.mock("../firebase", () => ({
+  auth: {},
+}));
+
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
 } from "firebase/auth";
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { auth } from "../firebase";
 
-const Signup = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+describe("Signup Component", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  test("should render Signup component", () => {
+    render(
+      <BrowserRouter>
+        <Signup />
+      </BrowserRouter>,
+    );
 
-    setError("");
-    setSuccess("");
+    expect(screen.getByRole("heading", { name: "Signup" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Enter your email")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Enter your password"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Confirm your password"),
+    ).toBeInTheDocument();
+  });
 
-    // Validation - All fields mandatory
-    if (!email || !password || !confirmPassword) {
-      setError("Please fill in all fields.");
-      return;
-    }
+  test("should show error when fields are empty", () => {
+    render(
+      <BrowserRouter>
+        <Signup />
+      </BrowserRouter>,
+    );
 
-    // Password match validation
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
+    fireEvent.click(screen.getByRole("button", { name: "Sign Up" }));
+    expect(screen.getByText("Please fill in all fields.")).toBeInTheDocument();
+  });
 
-    // Password length validation
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
+  test("should show error when passwords do not match", () => {
+    render(
+      <BrowserRouter>
+        <Signup />
+      </BrowserRouter>,
+    );
 
-    setLoading(true);
+    fireEvent.change(screen.getByPlaceholderText("Enter your email"), {
+      target: { value: "test@gmail.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Enter your password"), {
+      target: { value: "123456" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm your password"), {
+      target: { value: "1234567" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign Up" }));
 
-    try {
-      // Create user with Firebase
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
+    expect(screen.getByText("Passwords do not match.")).toBeInTheDocument();
+  });
 
-      // Send email verification
-      await sendEmailVerification(userCredential.user);
+  test("should show error when password is less than 6 characters", () => {
+    render(
+      <BrowserRouter>
+        <Signup />
+      </BrowserRouter>,
+    );
 
-      setSuccess(
+    fireEvent.change(screen.getByPlaceholderText("Enter your email"), {
+      target: { value: "test@gmail.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Enter your password"), {
+      target: { value: "12345" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm your password"), {
+      target: { value: "12345" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign Up" }));
+
+    expect(
+      screen.getByText("Password must be at least 6 characters."),
+    ).toBeInTheDocument();
+  });
+
+  test("should signup successfully with valid details", async () => {
+    createUserWithEmailAndPassword.mockResolvedValue({
+      user: {
+        email: "test@gmail.com",
+      },
+    });
+    sendEmailVerification.mockResolvedValue();
+
+    render(
+      <BrowserRouter>
+        <Signup />
+      </BrowserRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Enter your email"), {
+      target: { value: "test@gmail.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Enter your password"), {
+      target: { value: "123456" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm your password"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign Up" }));
+
+    expect(
+      await screen.findByText(
         "Signup successful! Please check your email and verify your account.",
-      );
-
-      // Clear form
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
-    } catch (error) {
-      let errorMessage = error.message;
-
-      if (error.code === "auth/email-already-in-use") {
-        errorMessage = "This email is already registered. Please login.";
-      } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Invalid email address.";
-      } else if (error.code === "auth/weak-password") {
-        errorMessage = "Password must be at least 6 characters.";
-      } else if (error.code === "auth/network-request-failed") {
-        errorMessage = "Network error. Please try again.";
-      }
-
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div style={{ maxWidth: "400px", margin: "50px auto", padding: "20px" }}>
-      <h2 style={{ textAlign: "center" }}>Signup</h2>
-
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: "15px" }}>
-          <label>📧 Email</label>
-          <br />
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ddd",
-              borderRadius: "4px",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: "15px" }}>
-          <label>🔒 Password</label>
-          <br />
-          <input
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ddd",
-              borderRadius: "4px",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: "15px" }}>
-          <label>🔒 Confirm Password</label>
-          <br />
-          <input
-            type="password"
-            placeholder="Confirm your password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ddd",
-              borderRadius: "4px",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        {error && <p style={{ color: "red", marginBottom: "10px" }}>{error}</p>}
-
-        {success && (
-          <p style={{ color: "green", marginBottom: "10px" }}>{success}</p>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "10px",
-            background: loading ? "#6c757d" : "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: loading ? "not-allowed" : "pointer",
-            fontSize: "16px",
-          }}
-        >
-          {loading ? "Signing up..." : "Sign Up"}
-        </button>
-      </form>
-
-      <div style={{ textAlign: "center", marginTop: "15px" }}>
-        Already have an account? <Link to="/login">Login</Link>
-      </div>
-    </div>
-  );
-};
-
-export default Signup;
+      ),
+    ).toBeInTheDocument();
+    expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(
+      {},
+      "test@gmail.com",
+      "123456",
+    );
+    expect(sendEmailVerification).toHaveBeenCalled();
+  });
+});
