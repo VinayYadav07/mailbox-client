@@ -1,3 +1,4 @@
+// Inbox.jsx (Updated with Polling)
 import { useState, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
@@ -60,10 +61,11 @@ const inboxReducer = (state, action) => {
   }
 };
 
-const Inbox = () => {
+const Inbox = ({ onUnreadCountChange }) => {
   const [state, dispatch] = useReducer(inboxReducer, initialState);
   const navigate = useNavigate();
 
+  // Fetch emails every 2 seconds
   useEffect(() => {
     const fetchEmails = async () => {
       const user = auth.currentUser;
@@ -96,14 +98,26 @@ const Inbox = () => {
           emailList.push({ id: doc.id, ...doc.data() });
         });
         dispatch({ type: "SET_EMAILS", payload: emailList });
+
+        // Notify App.js about unread count
+        if (onUnreadCountChange) {
+          onUnreadCountChange(emailList.filter((email) => !email.read).length);
+        }
       } catch (err) {
         console.error("Error fetching emails:", err);
         dispatch({ type: "SET_ERROR", payload: "Failed to load emails" });
       }
     };
 
+    // Initial fetch
     fetchEmails();
-  }, [navigate, state.currentView]);
+
+    // Poll every 2 seconds
+    const interval = setInterval(fetchEmails, 2000);
+
+    // Cleanup
+    return () => clearInterval(interval);
+  }, [navigate, state.currentView, onUnreadCountChange]);
 
   const handleEmailClick = async (email) => {
     if (email.read) {
