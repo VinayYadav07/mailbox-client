@@ -9,6 +9,7 @@ import {
   orderBy,
   doc,
   updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
 // Reducer for state management
@@ -42,6 +43,14 @@ const inboxReducer = (state, action) => {
           email.id === action.payload ? { ...email, read: true } : email,
         ),
         unreadCount: state.unreadCount - 1,
+      };
+    case "DELETE_EMAIL":
+      return {
+        ...state,
+        emails: state.emails.filter((email) => email.id !== action.payload),
+        unreadCount:
+          state.unreadCount -
+          (state.emails.find((e) => e.id === action.payload)?.read ? 0 : 1),
       };
     default:
       return state;
@@ -94,6 +103,20 @@ const Inbox = () => {
       dispatch({ type: "SELECT_EMAIL", payload: { ...email, read: true } });
     } catch (err) {
       console.error("Error marking email as read:", err);
+    }
+  };
+
+  const handleDelete = async (e, emailId) => {
+    e.stopPropagation(); // Prevent opening email
+    if (!confirm("Are you sure you want to delete this email?")) return;
+
+    try {
+      const emailRef = doc(db, "mails", emailId);
+      await deleteDoc(emailRef);
+      dispatch({ type: "DELETE_EMAIL", payload: emailId });
+    } catch (err) {
+      console.error("Error deleting email:", err);
+      alert("Failed to delete email. Please try again.");
     }
   };
 
@@ -350,7 +373,7 @@ const Inbox = () => {
               </span>
             </div>
             <span
-              style={{ color: "#999", fontSize: "12px", marginLeft: "10px" }}
+              style={{ color: "#999", fontSize: "12px", marginRight: "10px" }}
             >
               {email.createdAt?.toDate?.()
                 ? new Date(email.createdAt.toDate()).toLocaleTimeString([], {
@@ -359,6 +382,20 @@ const Inbox = () => {
                   })
                 : "Just now"}
             </span>
+            <button
+              onClick={(e) => handleDelete(e, email.id)}
+              style={{
+                padding: "4px 10px",
+                background: "#dc3545",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "12px",
+              }}
+            >
+              🗑️ Delete
+            </button>
           </div>
         ))}
       </div>
