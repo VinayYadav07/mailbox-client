@@ -27,9 +27,10 @@ vi.mock("firebase/firestore", () => ({
   orderBy: vi.fn(),
   doc: vi.fn(),
   updateDoc: vi.fn(),
+  deleteDoc: vi.fn(),
 }));
 
-import { getDocs, updateDoc } from "firebase/firestore";
+import { getDocs, updateDoc, deleteDoc } from "firebase/firestore";
 
 describe("Inbox Component", () => {
   beforeEach(() => {
@@ -261,25 +262,18 @@ describe("Inbox Component", () => {
     });
   });
 
-  // Test 9: Unread count updates - SKIP (timeout issue)
-  test.skip("should update unread count after marking email as read", async () => {});
+  // ========== DELETE TESTS ==========
 
-  // Test 10: Email details - SKIP (timeout issue)
-  test.skip("should show email details when clicking read email", async () => {});
-
-  // Test 11: Back button - SKIP (timeout issue)
-  test.skip("should return to inbox when back button is clicked", async () => {});
-
-  // Test 12: Unread count badge displays correctly
-  test("should display correct unread count in badge", async () => {
+  // Test 9: Delete button should be visible for each email
+  test("should show delete button for each email", async () => {
     const mockEmails = [
       {
         id: "1",
         data: () => ({
           from: "sender1@gmail.com",
           to: "test@example.com",
-          subject: "Unread 1",
-          message: "Message 1",
+          subject: "Test Subject 1",
+          message: "Test message 1",
           read: false,
           createdAt: { toDate: () => new Date() },
         }),
@@ -289,19 +283,8 @@ describe("Inbox Component", () => {
         data: () => ({
           from: "sender2@gmail.com",
           to: "test@example.com",
-          subject: "Unread 2",
-          message: "Message 2",
-          read: false,
-          createdAt: { toDate: () => new Date() },
-        }),
-      },
-      {
-        id: "3",
-        data: () => ({
-          from: "sender3@gmail.com",
-          to: "test@example.com",
-          subject: "Read 1",
-          message: "Message 3",
+          subject: "Test Subject 2",
+          message: "Test message 2",
           read: true,
           createdAt: { toDate: () => new Date() },
         }),
@@ -317,8 +300,190 @@ describe("Inbox Component", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("2")).toBeInTheDocument();
-      expect(screen.getByText("3 emails • 2 unread")).toBeInTheDocument();
+      const deleteButtons = screen.getAllByText("🗑️ Delete");
+      expect(deleteButtons.length).toBe(2);
+    });
+  });
+
+  // Test 10: Delete button click should call deleteDoc
+  test("should call deleteDoc when delete button is clicked", async () => {
+    const mockEmails = [
+      {
+        id: "1",
+        data: () => ({
+          from: "sender1@gmail.com",
+          to: "test@example.com",
+          subject: "Test Subject",
+          message: "Test message",
+          read: false,
+          createdAt: { toDate: () => new Date() },
+        }),
+      },
+    ];
+
+    mockGetDocsResponse(mockEmails);
+    deleteDoc.mockResolvedValue();
+
+    // Mock confirm to return true
+    window.confirm = vi.fn(() => true);
+
+    render(
+      <BrowserRouter>
+        <Inbox />
+      </BrowserRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Subject")).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByText("🗑️ Delete");
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => {
+      expect(deleteDoc).toHaveBeenCalled();
+    });
+  });
+
+  // Test 11: Email should be removed from list after delete
+  test("should remove email from list after successful delete", async () => {
+    const mockEmails = [
+      {
+        id: "1",
+        data: () => ({
+          from: "sender1@gmail.com",
+          to: "test@example.com",
+          subject: "Test Subject",
+          message: "Test message",
+          read: false,
+          createdAt: { toDate: () => new Date() },
+        }),
+      },
+    ];
+
+    mockGetDocsResponse(mockEmails);
+    deleteDoc.mockResolvedValue();
+
+    // Mock confirm to return true
+    window.confirm = vi.fn(() => true);
+
+    render(
+      <BrowserRouter>
+        <Inbox />
+      </BrowserRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Subject")).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByText("🗑️ Delete");
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Test Subject")).not.toBeInTheDocument();
+    });
+  });
+
+  // Test 12: Unread count should update after deleting unread email
+  test("should update unread count after deleting an unread email", async () => {
+    const mockEmails = [
+      {
+        id: "1",
+        data: () => ({
+          from: "sender1@gmail.com",
+          to: "test@example.com",
+          subject: "Unread Email",
+          message: "Test message",
+          read: false,
+          createdAt: { toDate: () => new Date() },
+        }),
+      },
+      {
+        id: "2",
+        data: () => ({
+          from: "sender2@gmail.com",
+          to: "test@example.com",
+          subject: "Read Email",
+          message: "Test message",
+          read: true,
+          createdAt: { toDate: () => new Date() },
+        }),
+      },
+    ];
+
+    mockGetDocsResponse(mockEmails);
+    deleteDoc.mockResolvedValue();
+
+    // Mock confirm to return true
+    window.confirm = vi.fn(() => true);
+
+    render(
+      <BrowserRouter>
+        <Inbox />
+      </BrowserRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("1")).toBeInTheDocument();
+    });
+
+    const deleteButtons = screen.getAllByText("🗑️ Delete");
+    fireEvent.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("0")).toBeInTheDocument();
+    });
+  });
+
+  // Test 13: Unread count should not change after deleting read email
+  test("should not change unread count after deleting a read email", async () => {
+    const mockEmails = [
+      {
+        id: "1",
+        data: () => ({
+          from: "sender1@gmail.com",
+          to: "test@example.com",
+          subject: "Read Email",
+          message: "Test message",
+          read: true,
+          createdAt: { toDate: () => new Date() },
+        }),
+      },
+      {
+        id: "2",
+        data: () => ({
+          from: "sender2@gmail.com",
+          to: "test@example.com",
+          subject: "Read Email 2",
+          message: "Test message",
+          read: true,
+          createdAt: { toDate: () => new Date() },
+        }),
+      },
+    ];
+
+    mockGetDocsResponse(mockEmails);
+    deleteDoc.mockResolvedValue();
+
+    // Mock confirm to return true
+    window.confirm = vi.fn(() => true);
+
+    render(
+      <BrowserRouter>
+        <Inbox />
+      </BrowserRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("0")).toBeInTheDocument();
+    });
+
+    const deleteButtons = screen.getAllByText("🗑️ Delete");
+    fireEvent.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("0")).toBeInTheDocument();
     });
   });
 });
