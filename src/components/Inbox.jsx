@@ -1,17 +1,9 @@
-// Inbox.jsx (Updated with Polling)
+// src/components/Inbox.jsx (Updated with Custom Hook)
 import { useState, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  orderBy,
-  doc,
-  updateDoc,
-  deleteDoc,
-} from "firebase/firestore";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { useFetchEmails } from "../hooks/useFetchEmails"; // Custom hook imported
 
 // Reducer for state management
 const initialState = {
@@ -65,56 +57,16 @@ const Inbox = ({ onUnreadCountChange }) => {
   const [state, dispatch] = useReducer(inboxReducer, initialState);
   const navigate = useNavigate();
 
-  // Fetch emails every 2 seconds
+  // Custom Hook use kiya
+  const { emails, loading, error } = useFetchEmails(state.currentView);
+
+  // Custom hook se aaye emails ko state mein update karein
   useEffect(() => {
-    const fetchEmails = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate("/login");
-        return;
-      }
-
-      try {
-        let q;
-        if (state.currentView === "sent") {
-          q = query(
-            collection(db, "mails"),
-            where("from", "==", user.email.toLowerCase()),
-            orderBy("createdAt", "desc"),
-          );
-        } else {
-          q = query(
-            collection(db, "mails"),
-            where("to", "==", user.email.toLowerCase()),
-            orderBy("createdAt", "desc"),
-          );
-        }
-
-        const querySnapshot = await getDocs(q);
-        const emailList = [];
-        querySnapshot.forEach((doc) => {
-          emailList.push({ id: doc.id, ...doc.data() });
-        });
-        dispatch({ type: "SET_EMAILS", payload: emailList });
-
-        // Unread count ko App.js ko bhejo
-        if (onUnreadCountChange) {
-          onUnreadCountChange(emailList.filter((email) => !email.read).length);
-        }
-      } catch (err) {
-        console.error("Error fetching emails:", err);
-        dispatch({ type: "SET_ERROR", payload: "Failed to load emails" });
-      }
-    };
-
-    fetchEmails();
-
-    // Poll every 2 seconds
-    const interval = setInterval(fetchEmails, 2000);
-
-    // Cleanup
-    return () => clearInterval(interval);
-  }, [navigate, state.currentView, onUnreadCountChange]);
+    dispatch({ type: "SET_EMAILS", payload: emails });
+    if (onUnreadCountChange) {
+      onUnreadCountChange(emails.filter((email) => !email.read).length);
+    }
+  }, [emails, onUnreadCountChange]);
 
   const handleEmailClick = async (email) => {
     if (email.read) {
@@ -164,10 +116,9 @@ const Inbox = ({ onUnreadCountChange }) => {
     navigate("/login");
   };
 
-  if (state.loading)
-    return <div style={{ padding: "20px" }}>Loading emails...</div>;
-  if (state.error)
-    return <div style={{ padding: "20px", color: "red" }}>{state.error}</div>;
+  if (loading) return <div style={{ padding: "20px" }}>Loading emails...</div>;
+  if (error)
+    return <div style={{ padding: "20px", color: "red" }}>{error}</div>;
 
   if (state.selectedEmail) {
     return (
